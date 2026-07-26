@@ -6,6 +6,13 @@ has opinions, and the two are on divergent trajectories.
 Built with Phaser 3 + Vite, in the same shape as
 [Dolomites](https://github.com/dobutler/Dolomites).
 
+## Credits
+
+The idea was initiated by Enis, my dear brother, and strengthened by
+Timothy, my dear husband. The first demo was built by me and Claude.
+This is a dream come true after years of playing *Theme Hospital* and
+*RollerCoaster Tycoon*.
+
 ## Setting up
 
 Bin schemes vary enormously across the UK: purple is general waste in
