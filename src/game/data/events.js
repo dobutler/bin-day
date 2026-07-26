@@ -54,7 +54,7 @@ export const scripted = [
       'boxes. Check the glass rules before you sort them.)',
     items: [
       'wine-bottle', 'wine-bottle', 'wine-bottle', 'wine-bottle',
-      'pizza-box-greasy', 'pizza-box-greasy', 'pizza-box-clean',
+      'pizza-box-base', 'pizza-box-base', 'pizza-box-lid',
       'crisp-packet', 'crisp-packet',
     ],
   },
@@ -63,16 +63,16 @@ export const scripted = [
     day: 33,
     type: 'dump',
     from: 'You',
-    text: 'You took the hedge down. All of it. The green bin is not ready for this.',
-    items: ['hedge', 'hedge', 'hedge', 'grass', 'grass'],
+    text: 'You took the hedge down. All of it. The garden bin is not ready for this.',
+    items: ['bamboo', 'triffid', 'lush-cuttings', 'lush-cuttings', 'moss-rock'],
   },
   {
     id: 'toaster-dies',
     day: 20,
     type: 'dump',
     from: 'You',
-    text: 'The toaster has died. No bin will take it.',
-    items: ['toaster', 'batteries'],
+    text: 'The television has died. No bin will take it.',
+    items: ['crt-tv', 'batteries'],
   },
 ];
 

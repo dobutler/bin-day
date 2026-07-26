@@ -48,7 +48,7 @@ data, and council letters are patches to that data.**
 | --- | --- |
 | `src/game/data/ruleset.js` | The starting rules: which bins exist, what each accepts, the collection rota, conduct rules |
 | `src/game/data/letters.js` | Council letters — prose plus a list of patch operations and an effective date |
-| `src/game/data/items.js` | The waste catalogue, including the traps (greasy pizza boxes, black plastic, Pyrex) |
+| `src/game/data/items.js` | The waste catalogue: pizza box lids and bases, sentient cheddar, encroaching bamboo, and the fly-tipping temptations |
 | `src/game/data/events.js` | Scripted and random interruptions: WhatsApp favours, foxes, wind, inspections |
 | `src/game/data/street.js` | The neighbours, their dials, and the chaos escalation milestones |
 | `src/game/data/palette.js` | Colour and sticker options, and the colour-to-function mapping |
@@ -56,13 +56,22 @@ data, and council letters are patches to that data.**
 | `src/game/systems/street.js` | The copycat mechanic: who follows your kerb, and what it costs |
 | `src/game/systems/rules.js` | Pure rules engine — derives the active ruleset for any day and answers all gameplay questions |
 | `src/game/systems/state.js` | Game state and the day-advance pipeline |
-| `src/game/scenes/Street.js` | The Phaser scene: house, drive, kerb, bins (drawn with primitives, no art assets) |
+| `src/game/scenes/Street.js` | The Phaser scene: a pixel-art three-quarter view drawn entirely with primitives at 480x270 and scaled up with nearest-neighbour |
+| `src/game/data/pixels.js` | Tiny bitmaps: house-number digits, bin stickers, recycling chevrons |
 | `src/ui/overlay.js` | HTML overlay: calendar, waste tray, post, phone |
 
 `activeRuleset(day)` rebuilds the rules from scratch each time by replaying
 every letter that has taken effect, so a save game only needs the day number
 and player state. Adding a new regulation means adding one object to
 `letters.js` — no engine changes.
+
+## Art direction
+
+Everything on the canvas is drawn procedurally at a low internal resolution
+and scaled up with `pixelArt: true`, so there are no sprite sheets to source
+or license and the whole game is one `npm install` away from running. That
+does cap the detail: a hand-drawn tileset would look considerably better, and
+the drawing code is isolated in `Street.js` if you want to swap to one later.
 
 ## Running it
 

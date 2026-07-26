@@ -1,15 +1,17 @@
 :root {
-  --ink: #22262a;
-  --paper: #f6f4ef;
-  --line: #d9d4c9;
-  --accent: #2f5d50;
+  --ink: #241610;
+  --paper: #f2e7d5;
+  --line: #b99a72;
+  --accent: #2c5a3e;
   --bad: #9b2c2c;
   --good: #2f6f4f;
+  --frame: #5a3a2a;
+  --backdrop: #52332a;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  background: #e8e5de;
+  background: var(--backdrop);
   color: var(--ink);
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -22,12 +24,22 @@ body {
   padding: 0 14px;
   align-items: start;
 }
-.stage { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #c7d4dd; }
-#game canvas { display: block; width: 100%; height: auto; }
+.stage {
+  border: 3px solid var(--frame); border-radius: 2px; overflow: hidden;
+  background: #8fa8bd; box-shadow: 0 0 0 2px rgba(0,0,0,.25);
+}
+#game canvas {
+  display: block; width: 100%; height: auto;
+  image-rendering: pixelated;      /* keep the pixels crisp when scaled up */
+  image-rendering: crisp-edges;
+}
 
 /* ---- HUD ---- */
 .hud {
   grid-column: 1 / -1;
+  border-width: 3px !important; border-color: var(--frame) !important;
+  border-radius: 2px !important;
+  font-family: "DejaVu Sans Mono", ui-monospace, Menlo, Consolas, monospace;
   display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
   background: var(--paper); border: 1px solid var(--line); border-radius: 6px;
   padding: 10px 14px; margin-bottom: 4px;
@@ -47,7 +59,7 @@ body {
 
 /* ---- side panel ---- */
 .panel {
-  background: var(--paper); border: 1px solid var(--line); border-radius: 6px;
+  background: var(--paper); border: 3px solid var(--frame); border-radius: 2px;
   display: flex; flex-direction: column; max-height: 78vh;
 }
 .tabs { display: flex; border-bottom: 1px solid var(--line); }
@@ -179,3 +191,34 @@ button.small { padding: 4px 10px; font-size: 12px; }
 .bar i.time { background: #3b6ea5; }
 .washlist { list-style: none; padding: 0; }
 .washlist li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+
+/* ---- calendar ---- */
+.cal-head, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-head span { font-size: 10px; text-transform: uppercase; color: #6b5b46; text-align: center; padding-bottom: 3px; }
+.cal-day {
+  background: #fff; border: 1px solid var(--line); min-height: 40px;
+  padding: 2px; font-size: 10px; position: relative;
+}
+.cal-day b { font-weight: 600; color: #6b5b46; }
+.cal-day.today { outline: 2px solid var(--accent); background: #fffbe9; }
+.cal-day.past { opacity: .5; }
+.cal-day .dots { display: flex; gap: 2px; margin-top: 3px; flex-wrap: wrap; }
+.cal-day .dots i { width: 7px; height: 9px; border-radius: 1px; display: block; }
+.cal-day em { display: block; font-style: normal; font-size: 8px; margin-top: 2px; }
+.cal-day .rule { color: var(--bad); }
+.cal-day .post-due { color: #6b5b46; }
+
+/* ---- phone-styled messages ---- */
+.msg { border-radius: 8px; }
+.msg:not(.council) { background: #dcf8c6; border-color: #c3e6ab; }
+.tabs button { font-size: 13px; }
+
+/* ---- item actions ---- */
+.item-actions {
+  margin-top: 10px; padding: 9px 10px; background: #fff;
+  border: 1px solid var(--line); border-radius: 4px;
+}
+.item-actions button { margin: 4px 4px 0 0; }
+button.danger { border-color: var(--bad); color: var(--bad); }
+.note-small { margin: 0 0 4px; font-size: 12px; color: #6b5b46; font-style: italic; }
+.chip { line-height: 1.3; }

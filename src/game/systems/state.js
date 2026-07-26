@@ -63,6 +63,7 @@ export function newGame(seed = 20260726, setup = {}) {
     firedEvents: new Set(),
     street: newStreet(),
     evening: freshEvening(),
+    visuals: { foxToday: false },
     over: false,
   };
   syncBins(state);
@@ -125,6 +126,12 @@ export function binItem(state, itemUid, binKey) {
   if (idx === -1) return false;
   const [item] = state.tray.splice(idx, 1);
   state.bins[binKey].items.push(item);
+
+  if (item.wildlife) {
+    state.standing -= 4;
+    pushLog(state, 'There was a hedgehog in that leaf pile. There was.', 'bad');
+    item.wildlife = false;
+  }
   return true;
 }
 
@@ -205,6 +212,59 @@ export function tidyBin(state, binKey) {
   return { ok: true };
 }
 
+// Breaking a box down trades a little of your time for a lot of bin space.
+export function flattenItem(state, itemUid) {
+  const item = state.tray.find((i) => i.uid === itemUid);
+  if (!item || !item.flattenable) return { ok: false, why: 'Nothing to flatten.' };
+  item.volume = item.flattenable;
+  item.flattenable = null;
+  item.name = item.name.replace('"Flat-Packed"', 'Flattened');
+  spendTime(state, 1);
+  return { ok: true };
+}
+
+// Somebody is asleep in that leaf pile.
+export function checkForWildlife(state, itemUid) {
+  const item = state.tray.find((i) => i.uid === itemUid);
+  if (!item || !item.wildlife) return { ok: false, why: 'Nothing living in that.' };
+  item.wildlife = false;
+  item.name = '🍂 Leaf Pile (hedgehog rehomed)';
+  state.standing += 2;
+  spendTime(state, 1);
+  pushLog(state, 'You moved the hedgehog to the back of the garden first.', 'good');
+  return { ok: true, rescued: true };
+}
+
+// High risk, high reward. Whether anyone is about makes all the difference,
+// which is what the window is for.
+export function flyTip(state, itemUid) {
+  const idx = state.tray.findIndex((i) => i.uid === itemUid);
+  if (idx === -1) return { ok: false, why: 'No such item.' };
+  const item = state.tray[idx];
+  if (!item.flyTip) return { ok: false, why: 'Not worth dumping.' };
+
+  const seen = state.evening.neighboursOut ? 0.65 : 0.2;
+  const caught = state.rand() < seen;
+  state.tray.splice(idx, 1);
+
+  if (caught) {
+    state.standing -= 12;
+    state.street.chaos += 3;
+    state.money = Math.max(0, state.money - 60);
+    state.messages.unshift({
+      from: 'District Council', day: state.day, unread: true,
+      text: 'A fixed penalty notice has been issued in respect of waste deposited on the verge at the end of your road. We have your name.',
+    });
+    pushLog(state, `Caught fly-tipping the ${item.name}. £60 fixed penalty.`, 'bad');
+    return { ok: true, caught: true };
+  }
+
+  state.money += item.flyTip;
+  state.street.chaos += 1;
+  pushLog(state, `The ${item.name} is somebody else's problem now. £${item.flyTip}.`, 'info');
+  return { ok: true, caught: false, gained: item.flyTip };
+}
+
 export function tipRun(state) {
   if (weekday(state.day) < 5)
     return { ok: false, why: 'The tip queue is only worth it at the weekend.' };
@@ -255,6 +315,7 @@ export function advanceDay(state) {
   rollRandomEvents(state, rs);
   deliverLetters(state);
   fireScriptedEvents(state);
+  tickTray(state);
   produce(state);
   recoverTime(state);
 
@@ -314,6 +375,14 @@ function resolveCollections(state, rs) {
       state.standing -= 6;
       spendTime(state, TIME_COST.missedCollection);
       pushLog(state, `${label} rejected. Contamination sticker: ${verdict.items.map((i) => i.name).join(', ')}.`, 'bad');
+
+      // Some things are not a mistake, they are a fine.
+      const fines = verdict.items.filter((i) => i.fine);
+      if (fines.length && rs.bins[bin.type].accepts.includes('paper-card')) {
+        const total = fines.reduce((n, i) => n + i.fine, 0);
+        state.money = Math.max(0, state.money - total);
+        pushLog(state, `£${total} fixed penalty for the greasy card.`, 'bad');
+      }
     }
   }
 }
@@ -367,21 +436,28 @@ function rollRandomEvents(state, rs) {
   const next = nextCollectionDay(state.day, rs);
   const black = state.bins.black;
   const grimy = Object.values(state.bins).some((b) => b.grime > 0.6);
+  const smelly = Object.values(state.bins)
+    .flatMap((b) => b.items)
+    .reduce((n, i) => n + (i.flies || 0), 0);
   const ctx = {
     day: state.day,
     daysUntilCollection: next ? next.day - state.day : 99,
     nextCollection: next,
     blackBinLeftOutOvernight: !!(black && black.atKerb && black.items.length),
-    grimyBins: grimy,
+    grimyBins: grimy || smelly > 6,
     binsAtKerb: Object.values(state.bins).filter((b) => b.atKerb).length,
     binsLeftAtKerb: Object.values(state.bins).filter((b) => b.atKerb).length,
     pick: (arr) => arr[Math.floor(state.rand() * arr.length)],
   };
 
+  state.visuals.foxToday = false;
+
   for (const ev of randomEvents) {
     if (ev.when && !ev.when(ctx)) continue;
     if (state.rand() > ev.chance) continue;
     const built = ev.build(ctx);
+
+    if (ev.id === 'fox') state.visuals.foxToday = true;
 
     if (built.effect === 'gale') applyGale(state, rs);
     if (built.standing) state.standing += built.standing;
@@ -440,6 +516,23 @@ function fireScriptedEvents(state) {
     });
     pushLog(state, `${ev.from}: ${ev.text}`, 'info');
   }
+}
+
+// The tray is not a safe place to leave certain items.
+function tickTray(state) {
+  const spawned = [];
+  for (const item of state.tray) {
+    if (item.grows) item.volume += item.grows;
+    // Capped, or it becomes the only thing in the game.
+    const already = state.tray.filter((i) => i.id === item.id).length;
+    if (item.duplicates && already < 5 && state.rand() < 0.45) spawned.push(makeItem(item.id));
+  }
+  if (spawned.length) {
+    state.tray.push(...spawned);
+    pushLog(state, `The bamboo has spread again. ${spawned.length} more of it.`, 'info');
+  }
+  const triffid = state.tray.find((i) => i.grows && i.volume > 8);
+  if (triffid) pushLog(state, 'The sapling in the tray is now taller than the wheelie bin.', 'info');
 }
 
 function produce(state) {

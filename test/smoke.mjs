@@ -47,7 +47,7 @@ console.log('black bin at kerb:', state.bins.black.atKerb, '| items:', state.bin
 for (let d = 0; d < 30; d++) {
   click('#btn-day');
   click('#modal-close');
-  ['post', 'phone', 'tray'].forEach((t) => click(`[data-tab="${t}"]`));
+  ['diary', 'post', 'phone', 'tray'].forEach((t) => click(`[data-tab="${t}"]`));
   if (d === 10) {
     click('[data-tab="post"]');
     click('[data-letter="0"]');
@@ -68,6 +68,14 @@ click('#modal-close');
 
 console.log('survived 30 days. day', state.day,
   '| standing', state.standing, '| chaos', state.street.chaos, '| bin time', state.binTime);
+click('[data-tab="diary"]');
+const cal = document.querySelector('#tab-body');
+console.log('calendar renders',
+  cal.querySelectorAll('.cal-day').length, 'days,',
+  cal.querySelectorAll('.cal-day .dots i').length, 'collection markers,',
+  cal.querySelectorAll('.today').length, 'today cell');
+click('[data-tab="tray"]');
+
 console.log('bin name in HUD uses chosen scheme:',
   /Purple/.test(document.querySelector('#hud-next').textContent) ||
   /purple/i.test(document.querySelector('#tab-body').textContent) ||

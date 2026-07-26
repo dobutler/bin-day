@@ -7,7 +7,9 @@ export function startGame(parent, state) {
     width: SIZE.W,
     height: SIZE.H,
     parent,
-    backgroundColor: '#c7d4dd',
+    backgroundColor: '#8fa8bd',
+    pixelArt: true,
+    roundPixels: true,
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
     scene: [Street],
     callbacks: {

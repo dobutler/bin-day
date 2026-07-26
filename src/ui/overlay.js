@@ -8,10 +8,13 @@ import {
   advanceDay, binItem, unbinItem, toggleKerb, rulesFor, answerFavour,
   buySubscription, tipRun, dayName, nameOf, fillTemplate, isAvailable,
   peekWindow, getDressed, washBin, tidyBin, WASH_COST,
+  flattenItem, checkForWildlife, flyTip,
 } from '../game/systems/state.js';
 import {
   collectionsOn, nextCollectionDay, correctBinsFor, DAY_NAMES, weekday,
+  allLetters,
 } from '../game/systems/rules.js';
+import { colourOf, defaultScheme } from '../game/data/palette.js';
 
 let state;
 let selectedUid = null;
@@ -41,6 +44,7 @@ function template() {
     <aside class="panel">
       <nav class="tabs">
         <button data-tab="tray" class="on">Waste <span id="c-tray"></span></button>
+        <button data-tab="diary">Calendar</button>
         <button data-tab="post">Post <span id="c-post"></span></button>
         <button data-tab="phone">Phone <span id="c-phone"></span></button>
       </nav>
@@ -210,7 +214,10 @@ function render() {
   if (sub && !sub.subscribed) btnSub.textContent = `Subscribe £${sub.costPerYear}`;
 
   q('#tab-body').innerHTML =
-    tab === 'tray' ? trayView(rs) : tab === 'post' ? postView() : phoneView();
+    tab === 'tray' ? trayView(rs)
+    : tab === 'diary' ? calendarView(rs)
+    : tab === 'post' ? postView()
+    : phoneView();
   bindTabBody(rs);
   bindEvening();
 }
@@ -221,8 +228,9 @@ function trayView(rs) {
 
   const chips = state.tray
     .map(
-      (i) => `<button class="chip ${selectedUid === i.uid ? 'sel' : ''}" data-uid="${i.uid}">
-        ${i.name}${i.volume > 2 ? ` <em>bulky</em>` : ''}</button>`
+      (i) => `<button class="chip ${selectedUid === i.uid ? 'sel' : ''}"
+        data-uid="${i.uid}" title="${(i.note || '').replace(/"/g, '&quot;')}">
+        ${i.name}${i.volume > 4 ? ` <em>${i.volume} vol</em>` : ''}</button>`
     )
     .join('');
 
@@ -243,8 +251,78 @@ function trayView(rs) {
     <p class="hint">Pick an item, then click a bin. Click a bin with nothing
     selected to wheel it out to the kerb.</p>
     <div class="chips">${chips || '<span class="empty">Tray empty.</span>'}</div>
+    ${itemActions()}
     <h4>In the bins</h4>${contents || '<p class="empty">All empty.</p>'}
   `;
+}
+
+// A month at a glance, in the player's own colours. This is the sheet you
+// actually plan around, so it shows what is collected when, plus the dates
+// the council's changes bite.
+function calendarView(rs) {
+  const startOfWeek = Math.floor(state.day / 7) * 7;
+  const first = Math.max(0, startOfWeek - 7);
+  const letters = allLetters();
+
+  let html = `<div class="cal"><div class="cal-head">${
+    DAY_NAMES.map((d) => `<span>${d}</span>`).join('')
+  }</div><div class="cal-grid">`;
+
+  for (let n = 0; n < 28; n++) {
+    const day = first + n;
+    const bins = collectionsOn(day, rs);
+    const effective = letters.filter((l) => l.effectiveDay === day);
+    const arriving = letters.filter((l) => l.arrivesDay === day);
+    const classes = [
+      'cal-day',
+      day === state.day ? 'today' : '',
+      day < state.day ? 'past' : '',
+    ].join(' ');
+
+    const dots = bins
+      .map((t) => {
+        const entry = state.scheme[t] || defaultScheme[t];
+        return `<i style="background:${colourOf(entry.colour).css}"></i>`;
+      })
+      .join('');
+
+    html += `<div class="${classes}">
+      <b>${day}</b>
+      <span class="dots">${dots}</span>
+      ${effective.length ? '<em class="rule">rules change</em>' : ''}
+      ${arriving.length ? '<em class="post-due">post</em>' : ''}
+    </div>`;
+  }
+
+  return html + `</div></div>
+    <p class="hint">Collection days show the bins due that morning. Put them
+    out the evening before.</p>`;
+}
+
+// Verbs that only apply to the item you have picked up.
+function itemActions() {
+  const item = state.tray.find((i) => i.uid === selectedUid);
+  if (!item) return '';
+
+  const verbs = [];
+  if (item.flattenable) verbs.push(`<button class="ghost small" data-act="flatten">Flatten it (${item.volume} → ${item.flattenable} vol)</button>`);
+  if (item.wildlife) verbs.push(`<button class="ghost small" data-act="wildlife">Check the pile first</button>`);
+  if (item.flyTip) verbs.push(`<button class="ghost small danger" data-act="flytip">Fly-tip it (£${item.flyTip})</button>`);
+
+  const warn = item.flyTip
+    ? `<p class="note-small">${state.evening.peeked
+        ? (state.evening.neighboursOut
+            ? 'Someone is out there. This would be seen.'
+            : 'Nobody about. You would probably get away with it.')
+        : 'You have not looked out of the window yet.'}</p>`
+    : '';
+
+  return verbs.length || item.note
+    ? `<div class="item-actions">
+        ${item.note ? `<p class="note-small">${item.note}</p>` : ''}
+        ${verbs.join(' ')}${warn}
+      </div>`
+    : '';
 }
 
 function postView() {
@@ -287,6 +365,22 @@ function bindTabBody(rs) {
   body.querySelectorAll('.chip').forEach((c) =>
     c.addEventListener('click', () => {
       selectedUid = selectedUid === c.dataset.uid ? null : c.dataset.uid;
+      render();
+    })
+  );
+  body.querySelectorAll('[data-act]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const uid = selectedUid;
+      let r;
+      if (b.dataset.act === 'flatten') r = flattenItem(state, uid);
+      if (b.dataset.act === 'wildlife') r = checkForWildlife(state, uid);
+      if (b.dataset.act === 'flytip') {
+        r = flyTip(state, uid);
+        selectedUid = null;
+        if (r.ok) toast(r.caught ? 'Caught. £60 penalty.' : `Gone. £${r.gained} better off.`);
+      }
+      if (r && !r.ok) toast(r.why);
+      bus.emit('state-changed');
       render();
     })
   );
