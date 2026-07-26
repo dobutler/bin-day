@@ -9,7 +9,7 @@ Built with Phaser 3 + Vite, in the same shape as
 ## Credits
 
 The idea was initiated by Enis, my dear brother, and strengthened by
-Timothy, my dear husband. The first demo was built by me and Claude.
+Timothy, my dear husband. The first demo was built by me with Claude.
 This is a dream come true after years of playing *Theme Hospital* and
 *RollerCoaster Tycoon*.
 
