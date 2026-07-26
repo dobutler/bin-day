@@ -48,7 +48,7 @@ export function applyOp(ruleset, { op, path, value }) {
 
 // ---------- the active ruleset ----------
 
-export function activeRuleset(day, subscriptions = {}) {
+export function activeRuleset(day, subscriptions = {}, extraShifts = []) {
   const rs = structuredClone(baseRuleset);
   const due = letters
     .filter((l) => l.effectiveDay <= day)
@@ -57,6 +57,10 @@ export function activeRuleset(day, subscriptions = {}) {
     for (const op of letter.ops) applyOp(rs, op);
     rs.version += 1;
   }
+  // One-off changes announced during play: bank holidays, roadworks, the
+  // crew being short. These live on game state, not in the letters.
+  for (const shift of extraShifts) rs.rota.holidayShifts.push(shift);
+
   // Player-purchased subscriptions are layered on last.
   for (const [binId, paid] of Object.entries(subscriptions)) {
     if (paid && rs.bins[binId] && rs.bins[binId].subscription) {

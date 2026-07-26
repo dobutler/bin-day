@@ -18,28 +18,36 @@ import { STICKER_ART, RECYCLE, stamp, stampNumber } from '../data/pixels.js';
 
 const W = 480;
 const H = 270;
-const KERB_Y = 214;   // where bins stand on the pavement edge
-const DRIVE_Y = 178;  // where they live the rest of the time
+const KERB_Y = 214;   // the verge at the edge of the lane
+const DRIVE_Y = 190;  // the gravel by the cottage, the rest of the time
 
 const C = {
-  sky:       0x8fa8bd,
-  brick:     0x8c3b2e,
-  brickAlt:  0x7c3327,
-  mortar:    0x5e2a20,
-  roof:      0x4a2f24,
-  roofDark:  0x38221a,
+  sky:       0xa9c2d4,
+  skyLow:    0xc8d8e2,
+  hill:      0x7d9a55,
+  hillFar:   0x93aa6b,
+  wall:      0xe4d7bd,   // limewashed render
+  wallShade: 0xd2c3a5,
+  stone:     0xb8a887,
+  thatch:    0xb08f4e,
+  thatchDk:  0x8e7038,
+  roof:      0xb08f4e,
+  roofDark:  0x8e7038,
   outline:   0x241610,
-  grass:     0x5f8a37,
-  grassDark: 0x4c7029,
+  grass:     0x6f9440,
+  grassDark: 0x577a2f,
   hedge:     0x3f6b26,
-  path:      0x9a938a,
-  pathDark:  0x827b73,
-  pavement:  0xa8a29a,
-  kerb:      0x87817a,
-  road:      0x3f3f42,
-  roadLine:  0xd0d0d0,
+  hedgeDark: 0x2f5320,
+  path:      0xc3b394,
+  pathDark:  0xa89877,
+  pavement:  0xb5a98d,
+  kerb:      0x9a8e74,
+  road:      0x53504a,
+  roadLine:  0xcfc6b0,
   fence:     0x7c5a38,
   fenceDark: 0x5f4429,
+  rose:      0xc85a7a,
+  bloom:     0xe8dc6a,
   glass:     0x9fc4d6,
   frame:     0xe8e4dc,
   door:      0x2c5a3e,
@@ -67,6 +75,7 @@ export class Street extends Phaser.Scene {
     this.drawBackdrop();
 
     this.streetLayer = this.add.graphics();
+    this.pileLayer = this.add.graphics();
     this.wildlife = this.add.graphics();
     this.binLayer = this.add.container(0, 0);
     this.resident = this.add.graphics();
@@ -83,58 +92,95 @@ export class Street extends Phaser.Scene {
     const g = this.backdrop;
     g.clear();
 
-    g.fillStyle(C.sky, 1).fillRect(0, 0, W, 40);
+    // sky, and the fields behind the cottage
+    g.fillStyle(C.sky, 1).fillRect(0, 0, W, 30);
+    g.fillStyle(C.skyLow, 1).fillRect(0, 22, W, 12);
+    g.fillStyle(C.hillFar, 1);
+    for (let x = 0; x < W; x += 2) {
+      g.fillRect(x, 30 + Math.round(Math.sin(x / 42) * 5), 2, 20);
+    }
+    g.fillStyle(C.hill, 1);
+    for (let x = 0; x < W; x += 2) {
+      g.fillRect(x, 44 + Math.round(Math.sin(x / 30 + 2) * 4), 2, 26);
+    }
+    // a drystone wall between the fields
+    g.fillStyle(C.stone, 1);
+    for (let x = 0; x < W; x += 9) g.fillRect(x, 58 + ((x / 9) % 2), 8, 3);
 
-    // Terrace roof, stepped so it reads as pixel art rather than a smooth ramp.
-    g.fillStyle(C.roof, 1);
-    for (let n = 0; n < 22; n++) g.fillRect(0, 40 - n * 2, 14 + n * 9, 2);
-    g.fillStyle(C.roofDark, 1).fillRect(0, 40, 212, 4);
+    // the cottage: limewashed render, thatched roof, chimney
+    g.fillStyle(C.wall, 1).fillRect(28, 74, 176, 84);
+    g.fillStyle(C.wallShade, 1).fillRect(28, 74, 6, 84);
+    g.fillStyle(C.stone, 1).fillRect(28, 150, 176, 8);
 
-    // Brick wall, course by course with offset rows.
-    for (let y = 44; y < 158; y += 5) {
-      const offset = ((y - 44) / 5) % 2 === 0 ? 0 : 5;
-      for (let x = -10; x < 200; x += 11) {
-        g.fillStyle((x + y) % 3 === 0 ? C.brickAlt : C.brick, 1);
-        g.fillRect(x + offset, y, 10, 4);
+    // thatch, drawn as stepped courses with a shaggy bottom edge
+    g.fillStyle(C.thatch, 1);
+    for (let n = 0; n < 26; n++) {
+      g.fillRect(16 + n * 3.6, 74 - n * 2, 200 - n * 7.2, 2);
+    }
+    g.fillStyle(C.thatchDk, 1);
+    for (let x = 16; x < 216; x += 4) g.fillRect(x, 72, 3, 4);
+    g.fillStyle(C.thatch, 1).fillRect(16, 68, 200, 5);
+
+    // chimney and smoke
+    g.fillStyle(C.stone, 1).fillRect(150, 20, 18, 34);
+    g.fillStyle(C.wallShade, 1).fillRect(150, 18, 18, 4);
+    g.fillStyle(0xffffff, 0.35);
+    g.fillRect(158, 10, 5, 5);
+    g.fillRect(163, 3, 4, 4);
+
+    this.window(g, 46, 92, 32, 28);
+    this.window(g, 152, 92, 32, 28);
+    g.fillStyle(C.roofDark, 1).fillRect(102, 108, 34, 50);   // door frame
+    g.fillStyle(0x3d6b4a, 1).fillRect(105, 111, 28, 47);     // door
+    g.fillStyle(C.bloom, 1).fillRect(128, 134, 3, 3);        // knocker
+
+    // climbing rose either side of the door
+    for (const bx of [96, 138]) {
+      g.fillStyle(C.hedgeDark, 1).fillRect(bx, 116, 2, 42);
+      for (let n = 0; n < 7; n++) {
+        const rx = bx + ((n % 2) ? 3 : -3);
+        g.fillStyle(C.hedge, 1).fillRect(rx, 120 + n * 5, 3, 3);
+        if (n % 2 === 0) g.fillStyle(C.rose, 1).fillRect(rx + 1, 118 + n * 5, 2, 2);
       }
     }
-    g.fillStyle(C.mortar, 1).fillRect(196, 44, 4, 114);
 
-    // Windows, door, drainpipe.
-    this.window(g, 24, 60, 34, 30);
-    this.window(g, 120, 60, 34, 30);
-    g.fillStyle(C.frame, 1).fillRect(58, 108, 34, 50);
-    g.fillStyle(C.door, 1).fillRect(61, 111, 28, 47);
-    g.fillStyle(C.lampGlow, 1).fillRect(84, 132, 3, 3);
-    g.fillStyle(C.mortar, 1).fillRect(184, 44, 3, 114);
-
-    // Fence and hedge running off to the right.
-    g.fillStyle(C.fenceDark, 1).fillRect(200, 96, W - 200, 40);
+    // hedgerow to the right, with a five-bar gate
+    g.fillStyle(C.hedge, 1).fillRect(216, 108, W - 216, 50);
+    g.fillStyle(C.hedgeDark, 1);
+    for (let x = 218; x < W; x += 7) g.fillRect(x, 108 + ((x % 3) * 3), 4, 8);
+    g.fillStyle(C.bloom, 0.8);
+    for (let x = 224; x < W; x += 23) g.fillRect(x, 118, 2, 2);
     g.fillStyle(C.fence, 1);
-    for (let x = 202; x < W; x += 7) g.fillRect(x, 96, 5, 40);
-    g.fillStyle(C.hedge, 1).fillRect(200, 128, W - 200, 16);
+    g.fillRect(300, 118, 3, 40);
+    g.fillRect(352, 118, 3, 40);
+    for (let n = 0; n < 4; n++) g.fillRect(300, 122 + n * 9, 55, 2);
+
+    // cottage garden, gravel path, verge, lane
+    g.fillStyle(C.grass, 1).fillRect(0, 158, W, 40);
     g.fillStyle(C.grassDark, 1);
-    for (let x = 204; x < W; x += 9) g.fillRect(x, 124, 3, 5);
+    for (let x = 4; x < W; x += 11) g.fillRect(x, 162 + ((x % 4) * 5), 3, 3);
+    g.fillStyle(C.bloom, 0.9);
+    for (let x = 250; x < W; x += 31) g.fillRect(x, 166 + ((x % 3) * 6), 2, 2);
+    g.fillStyle(C.rose, 0.9);
+    for (let x = 262; x < W; x += 37) g.fillRect(x, 174, 2, 2);
 
-    // Front garden, path, pavement, kerb, road.
-    g.fillStyle(C.grass, 1).fillRect(0, 144, W, 52);
-    g.fillStyle(C.grassDark, 1);
-    for (let x = 6; x < W; x += 13) g.fillRect(x, 150 + ((x % 3) * 4), 3, 3);
-
-    g.fillStyle(C.path, 1).fillRect(60, 158, 30, 38);
-    g.fillStyle(C.pathDark, 1).fillRect(60, 158, 30, 2);
-    g.fillStyle(C.path, 1).fillRect(140, 158, 96, 38);   // the drive
-
-    g.fillStyle(C.pavement, 1).fillRect(0, 196, W, 22);
+    g.fillStyle(C.path, 1).fillRect(104, 158, 30, 40);
+    g.fillStyle(C.path, 1).fillRect(140, 168, 100, 30);      // where the bins live
     g.fillStyle(C.pathDark, 1);
-    for (let x = 0; x < W; x += 24) g.fillRect(x, 196, 1, 22);
+    for (let x = 106; x < 240; x += 7) g.fillRect(x, 170 + ((x % 5) * 4), 2, 2);
+
+    g.fillStyle(C.pavement, 1).fillRect(0, 198, W, 20);
+    g.fillStyle(C.grassDark, 1);
+    for (let x = 0; x < W; x += 6) g.fillRect(x, 198, 2, 3);  // grass verge edge
     g.fillStyle(C.kerb, 1).fillRect(0, 216, W, 4);
 
     g.fillStyle(C.road, 1).fillRect(0, 220, W, H - 220);
-    g.fillStyle(C.roadLine, 0.8);
-    for (let x = 8; x < W; x += 40) g.fillRect(x, 250, 20, 3);
+    g.fillStyle(C.roadLine, 0.35);
+    for (let x = 4; x < W; x += 46) g.fillRect(x, 246, 16, 2);
+    g.fillStyle(0x45423d, 1);
+    for (let x = 0; x < W; x += 13) g.fillRect(x, 232 + ((x % 3) * 9), 5, 2);
 
-    this.lamp(g, 30);
+    this.lamp(g, 40);
   }
 
   window(g, x, y, w, h) {
@@ -146,10 +192,13 @@ export class Street extends Phaser.Scene {
   }
 
   lamp(g, x) {
-    g.fillStyle(C.lamp, 1).fillRect(x, 70, 4, 128);
-    g.fillRect(x - 6, 68, 16, 4);
-    g.fillStyle(C.lampGlow, 1).fillRect(x - 5, 72, 14, 5);
-    g.fillStyle(C.lamp, 1).fillRect(x - 4, 196, 12, 3);
+    // A black cast-iron lamp post, of the sort a parish council is proud of.
+    g.fillStyle(C.lamp, 1).fillRect(x, 96, 3, 102);
+    g.fillRect(x - 3, 194, 9, 4);
+    g.fillRect(x - 4, 84, 11, 3);
+    g.fillStyle(C.lampGlow, 1).fillRect(x - 3, 87, 9, 9);
+    g.fillStyle(C.lamp, 1).fillRect(x - 4, 82, 11, 2);
+    g.fillRect(x + 1, 78, 1, 4);
   }
 
   // ---------- bins ----------
@@ -166,12 +215,13 @@ export class Street extends Phaser.Scene {
     }
 
     const mine = keys.filter((k) => !this.state.bins[k].neighbour);
-    mine.forEach((key, i) => this.placeBin(key, 150 + i * 26, rs));
+    mine.forEach((key, i) => this.placeBin(key, 156 + i * 26, rs));
 
     const nbr = keys.find((k) => this.state.bins[k].neighbour);
-    if (nbr) this.placeBin(nbr, 96, rs);
+    if (nbr) this.placeBin(nbr, 74, rs);
 
     this.drawStreetBins(rs);
+    this.drawPile();
     this.drawWildlife();
     this.drawResident();
   }
@@ -306,12 +356,25 @@ export class Street extends Phaser.Scene {
     }
   }
 
+  drawPile() {
+    const g = this.pileLayer;
+    g.clear();
+    const bags = Math.min(9, this.state.tray.length - 14);
+    for (let n = 0; n < bags; n++) {
+      const x = 44 + (n % 3) * 13;
+      const y = 186 + Math.floor(n / 3) * 8;
+      g.fillStyle(0x000000, 0.18).fillRect(x - 1, y + 7, 12, 2);
+      g.fillStyle(0x2f3338, 1).fillRect(x, y, 11, 8);
+      g.fillStyle(0x44494f, 1).fillRect(x + 2, y - 2, 6, 3);
+    }
+  }
+
   drawWildlife() {
     const g = this.wildlife;
     g.clear();
     if (!this.state.visuals || !this.state.visuals.foxToday) return;
-    this.fox(g, 300, 190);
-    this.fox(g, 336, 186);
+    this.fox(g, 286, 194);
+    this.fox(g, 330, 188);
   }
 
   fox(g, x, y) {
@@ -334,8 +397,8 @@ export class Street extends Phaser.Scene {
   drawResident() {
     const g = this.resident;
     g.clear();
-    const spot = this.walkTo || { x: 132, y: DRIVE_Y };
-    const x = Math.max(96, spot.x - 16);
+    const spot = this.walkTo || { x: 138, y: DRIVE_Y };
+    const x = Math.max(112, spot.x - 18);
     const y = spot.y;
 
     g.fillStyle(0x000000, 0.16).fillRect(x - 3, y, 8, 2);

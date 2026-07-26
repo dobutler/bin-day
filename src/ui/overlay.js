@@ -9,6 +9,7 @@ import {
   buySubscription, tipRun, dayName, nameOf, fillTemplate, isAvailable,
   peekWindow, getDressed, washBin, tidyBin, WASH_COST,
   flattenItem, checkForWildlife, flyTip,
+  bookTipSlot, tipQueue, pileSize, PILE_THRESHOLD,
 } from '../game/systems/state.js';
 import {
   collectionsOn, nextCollectionDay, correctBinsFor, DAY_NAMES, weekday,
@@ -37,7 +38,6 @@ function template() {
         <div class="meter"><label>Community standing</label><div class="bar"><i id="bar-standing"></i></div></div>
         <div class="meter"><label>Street chaos</label><div class="bar"><i id="bar-chaos" class="chaos"></i></div></div>
         <div class="meter"><label>Bin time</label><div class="bar"><i id="bar-time" class="time"></i></div></div>
-        <div class="money" id="hud-money"></div>
       </div>
     </header>
 
@@ -50,8 +50,9 @@ function template() {
       </nav>
       <div class="tab-body" id="tab-body"></div>
       <div class="evening" id="evening"></div>
+      <div class="purse-row"><span id="purse"></span></div>
       <div class="actions">
-        <button id="btn-tip" class="ghost">Tip run</button>
+        <button id="btn-tip" class="ghost">The tip</button>
         <button id="btn-wash" class="ghost">Wash bins</button>
         <button id="btn-sub" class="ghost hidden">Subscribe</button>
         <button id="btn-day" class="primary">End the day</button>
@@ -76,12 +77,7 @@ function wire(root) {
     render();
     showDaySummary(events);
   });
-  root.querySelector('#btn-tip').addEventListener('click', () => {
-    const r = tipRun(state);
-    toast(r.ok ? `Tip run: ${r.removed} item(s) dealt with.` : r.why);
-    bus.emit('state-changed');
-    render();
-  });
+  root.querySelector('#btn-tip').addEventListener('click', () => openTipSheet());
   root.querySelector('#btn-sub').addEventListener('click', () => {
     const r = buySubscription(state, 'green');
     toast(r.ok ? 'Garden waste subscription purchased. £60.' : r.why);
@@ -145,6 +141,52 @@ function bindEvening() {
   });
 }
 
+// The recycling centre. Everyone can only go at the weekend, which is
+// precisely why going at the weekend is a bad idea.
+function openTipSheet() {
+  const q = tipQueue(state);
+  const takeable = ['bulky', 'hazardous', 'electricals', 'textiles', 'glass', 'garden', 'general'];
+  const load = state.tray.filter((i) => takeable.includes(i.category));
+
+  const slots = [1, 2, 3, 4, 5, 6, 7]
+    .map((n) => state.day + n)
+    .map((d) => {
+      const busy = weekday(d) >= 5;
+      return `<li><span>${dayName(d)}, day ${d} ${busy ? '<em>busy</em>' : ''}</span>
+        <button class="ghost small" data-slot="${d}">Book</button></li>`;
+    })
+    .join('');
+
+  showModal(`<h3>Household Recycling Centre</h3>
+    <p>${load.length} item(s) in the car. Queue right now: about
+    <b>${q.minutes} minutes</b>${q.booked ? ' — you have a slot' : ''}.</p>
+    ${q.busy && !q.booked
+      ? '<p class="note-small">It is the weekend. Everybody else is also here, because the weekend is the only time anybody can come. There is a real chance of being turned away at the barrier.</p>'
+      : ''}
+    ${state.tipSlot ? `<p class="note-small">Slot booked for ${dayName(state.tipSlot)}, day ${state.tipSlot}.</p>` : ''}
+    <p><button class="primary" data-go="tip">Go now (costs ${q.cost} bin time)</button></p>
+    <h4>Book a slot</h4>
+    <ul class="washlist">${slots}</ul>`);
+
+  document.querySelector('[data-go="tip"]').addEventListener('click', () => {
+    const r = tipRun(state);
+    toast(r.ok
+      ? `${r.removed} item(s) gone. ${r.queue.booked ? 'Straight in.' : 'That queue.'}`
+      : r.why);
+    closeModal();
+    bus.emit('state-changed');
+    render();
+  });
+  document.querySelectorAll('[data-slot]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const r = bookTipSlot(state, Number(b.dataset.slot));
+      toast(r.ok ? `Slot booked for day ${r.day}.` : r.why);
+      openTipSheet();
+      render();
+    })
+  );
+}
+
 function openWashSheet() {
   const rs = rulesFor(state);
   const rows = Object.entries(state.bins)
@@ -191,7 +233,7 @@ function render() {
 
   q('#bar-standing').style.width = `${state.standing}%`;
   q('#bar-standing').className = state.standing < 30 ? 'low' : state.standing < 60 ? 'mid' : '';
-  q('#hud-money').textContent = `£${state.money}`;
+  q('#purse').textContent = `£${state.money}`;
   q('#bar-chaos').style.width = `${Math.min(100, state.street.chaos * 6)}%`;
   q('#bar-time').style.width = `${state.binTime}%`;
   q('#evening').innerHTML = eveningStrip();
@@ -247,9 +289,16 @@ function trayView(rs) {
     })
     .join('');
 
+  const pile = pileSize(state);
+  const pileNote = pile
+    ? `<p class="pile">${pile} bag(s) by the back door. The tray only holds
+       ${PILE_THRESHOLD}; the rest is stacking up outside.</p>`
+    : '';
+
   return `
     <p class="hint">Pick an item, then click a bin. Click a bin with nothing
     selected to wheel it out to the kerb.</p>
+    ${pileNote}
     <div class="chips">${chips || '<span class="empty">Tray empty.</span>'}</div>
     ${itemActions()}
     <h4>In the bins</h4>${contents || '<p class="empty">All empty.</p>'}

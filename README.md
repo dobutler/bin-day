@@ -51,7 +51,7 @@ data, and council letters are patches to that data.**
 | `src/game/systems/street.js` | The copycat mechanic: who follows your kerb, and what it costs |
 | `src/game/systems/rules.js` | Pure rules engine — derives the active ruleset for any day and answers all gameplay questions |
 | `src/game/systems/state.js` | Game state and the day-advance pipeline |
-| `src/game/scenes/Street.js` | The Phaser scene: a pixel-art three-quarter view drawn entirely with primitives at 480x270 and scaled up with nearest-neighbour |
+| `src/game/scenes/Street.js` | The Phaser scene: a pixel-art three-quarter view of a thatched cottage on a country lane, drawn entirely with primitives at 480x270 |
 | `src/game/data/pixels.js` | Tiny bitmaps: house-number digits, bin stickers, recycling chevrons |
 | `src/ui/overlay.js` | HTML overlay: calendar, waste tray, post, phone |
 
@@ -59,6 +59,15 @@ data, and council letters are patches to that data.**
 every letter that has taken effect, so a save game only needs the day number
 and player state. Adding a new regulation means adding one object to
 `letters.js` — no engine changes.
+
+## The tip
+
+The recycling centre takes what no bin will. It is open every day, but
+everybody can only go at the weekend, which is exactly why the weekend is
+the worst time to go: a ninety-five minute queue and a real chance of being
+turned away at the barrier when the site fills. You can book a slot in
+advance instead, which cuts the queue to fifteen minutes. Booking is the
+single best use of your bin time in the game.
 
 ## Art direction
 

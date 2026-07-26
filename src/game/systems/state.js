@@ -29,9 +29,15 @@ export function makeItem(id) {
 }
 
 // Time costs, gathered in one place so they are easy to tune.
+// How full the tray can get before the surplus becomes bags by the back
+// door. The tip empties them; the pile is what punishes you for waiting.
+export const PILE_THRESHOLD = 14;
+
 export const TIME_COST = {
   missedCollection: 8,
-  tipRun: 12,
+  tipQueueBooked: 5,
+  tipQueueWeekday: 11,
+  tipQueueWeekend: 20,
   tidyTippedBin: 4,
   getDressed: 2,
   binMuddle: 6,
@@ -64,6 +70,8 @@ export function newGame(seed = 20260726, setup = {}) {
     firedEvents: new Set(),
     street: newStreet(),
     evening: freshEvening(),
+    shifts: [],        // one-off collection day changes announced during play
+    tipSlot: null,     // booked slot at the recycling centre
     visuals: { foxToday: false },
     over: false,
   };
@@ -77,7 +85,12 @@ function freshEvening() {
 }
 
 export function rulesFor(state) {
-  return activeRuleset(state.day, state.subscriptions);
+  return activeRuleset(state.day, state.subscriptions, state.shifts);
+}
+
+// Everything past the threshold is sitting in bags by the back door.
+export function pileSize(state) {
+  return Math.max(0, state.tray.length - PILE_THRESHOLD);
 }
 
 function syncBins(state) {
@@ -266,16 +279,43 @@ export function flyTip(state, itemUid) {
   return { ok: true, caught: false, gained: item.flyTip };
 }
 
+// You can book a slot at the recycling centre, but only for a future day,
+// because of course you can.
+export function bookTipSlot(state, day) {
+  if (day <= state.day) return { ok: false, why: 'Slots must be booked in advance.' };
+  state.tipSlot = day;
+  return { ok: true, day };
+}
+
+export function tipQueue(state) {
+  const isWeekend = weekday(state.day) >= 5;
+  if (state.tipSlot === state.day) return { minutes: 15, cost: TIME_COST.tipQueueBooked, booked: true };
+  if (!isWeekend) return { minutes: 40, cost: TIME_COST.tipQueueWeekday, booked: false };
+  return { minutes: 95, cost: TIME_COST.tipQueueWeekend, booked: false, busy: true };
+}
+
 export function tipRun(state) {
-  if (weekday(state.day) < 5)
-    return { ok: false, why: 'The tip queue is only worth it at the weekend.' };
   const takeable = ['bulky', 'hazardous', 'electricals', 'textiles', 'glass', 'garden', 'general'];
+  if (!state.tray.some((i) => takeable.includes(i.category)))
+    return { ok: false, why: 'Nothing the tip would take.' };
+
+  const queue = tipQueue(state);
+  if (state.binTime < queue.cost)
+    return { ok: false, why: 'Not enough of the weekend left for that queue.' };
+
+  // Saturday afternoon without a booking. Everyone else had the same idea.
+  if (queue.busy && !queue.booked && state.rand() < 0.3) {
+    spendTime(state, Math.round(queue.cost / 2));
+    return { ok: false, turnedAway: true,
+      why: 'Site full. You queued for forty minutes and were turned away at the barrier.' };
+  }
+
   const before = state.tray.length;
   state.tray = state.tray.filter((i) => !takeable.includes(i.category));
   const removed = before - state.tray.length;
-  if (!removed) return { ok: false, why: 'Nothing the tip would take.' };
-  spendTime(state, TIME_COST.tipRun);
-  return { ok: true, removed };
+  spendTime(state, queue.cost);
+  if (state.tipSlot === state.day) state.tipSlot = null;
+  return { ok: true, removed, queue };
 }
 
 export function answerFavour(state, accept) {
@@ -319,6 +359,7 @@ export function advanceDay(state) {
   if (!eventFired) rollChatter(state);
   tickTray(state);
   produce(state);
+  resolvePile(state);
   recoverTime(state);
 
   state.evening = freshEvening();
@@ -446,7 +487,8 @@ function rollRandomEvents(state, rs) {
     daysUntilCollection: next ? next.day - state.day : 99,
     nextCollection: next,
     blackBinLeftOutOvernight: !!(black && black.atKerb && black.items.length),
-    grimyBins: grimy || smelly > 6,
+    pile: pileSize(state),
+    grimyBins: grimy || smelly > 14 || pileSize(state) > 8,
     binsAtKerb: Object.values(state.bins).filter((b) => b.atKerb).length,
     binsLeftAtKerb: Object.values(state.bins).filter((b) => b.atKerb).length,
     pick: (arr) => arr[Math.floor(state.rand() * arr.length)],
@@ -454,14 +496,22 @@ function rollRandomEvents(state, rs) {
 
   state.visuals.foxToday = false;
 
+  if (!state.eventCooldowns) state.eventCooldowns = {};
+
   for (const ev of randomEvents) {
     if (ev.when && !ev.when(ctx)) continue;
+    // Without a cooldown the same misfortune lands every other morning and
+    // stops reading as misfortune.
+    const last = state.eventCooldowns[ev.id];
+    if (ev.cooldown && last !== undefined && state.day - last < ev.cooldown) continue;
     if (state.rand() > ev.chance) continue;
+    state.eventCooldowns[ev.id] = state.day;
     const built = ev.build(ctx);
 
     if (ev.id === 'fox') state.visuals.foxToday = true;
 
     if (built.effect === 'gale') applyGale(state, rs);
+    if (built.effect === 'shift-collection') state.shifts.push(built.shift);
     if (built.standing) state.standing += built.standing;
 
     state.messages.unshift({
@@ -553,13 +603,26 @@ function tickTray(state) {
 
 function produce(state) {
   const total = dailyProduction.base.reduce((n, w) => n + w.weight, 0);
-  const count = 3 + Math.floor(state.rand() * 3);
+  const count = 2 + Math.floor(state.rand() * 3);
   for (let n = 0; n < count; n++) {
     let r = state.rand() * total;
     for (const w of dailyProduction.base) {
       r -= w.weight;
       if (r <= 0) { state.tray.push(makeItem(w.id)); break; }
     }
+  }
+}
+
+// Bags by the back door are not a neutral holding area.
+function resolvePile(state) {
+  const pile = pileSize(state);
+  if (pile <= 0) return;
+  if (pile > 10) {
+    state.standing -= 2;
+    pushLog(state, `There are ${pile} bags by the back door. You can see them from the lane.`, 'bad');
+  } else if (pile > 4) {
+    state.standing -= 1;
+    pushLog(state, `The bags by the back door are becoming a feature.`, 'bad');
   }
 }
 

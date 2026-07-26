@@ -78,9 +78,31 @@ export const scripted = [
 
 export const random = [
   {
+    id: 'day-change',
+    chance: 0.1,
+    cooldown: 9,
+    when: (ctx) => ctx.daysUntilCollection >= 3 && ctx.nextCollection,
+    build: (ctx) => ({
+      type: 'notice',
+      from: 'District Council',
+      effect: 'shift-collection',
+      shift: {
+        fromDay: ctx.nextCollection.day,
+        toDay: ctx.nextCollection.day,
+        shiftDays: 1,
+      },
+      text: ctx.pick([
+        'Due to a bank holiday, your next collection will take place one day later than usual.',
+        'Because of resurfacing works on your road, the next collection will be one day later.',
+        'Owing to vehicle availability, your next collection has been moved back by one day. We apologise for any inconvenience.',
+      ]),
+    }),
+  },
+  {
     id: 'fox',
-    chance: 0.25,
-    when: (ctx) => ctx.blackBinLeftOutOvernight,
+    chance: 0.2,
+    cooldown: 4,
+    when: (ctx) => ctx.blackBinLeftOutOvernight || ctx.pile > 4,
     build: () => ({
       type: 'incident',
       from: 'Overnight',
@@ -90,7 +112,8 @@ export const random = [
   },
   {
     id: 'wind',
-    chance: 0.18,
+    chance: 0.14,
+    cooldown: 5,
     when: (ctx) => ctx.binsLeftAtKerb >= 2,
     build: () => ({
       type: 'incident',
@@ -101,7 +124,8 @@ export const random = [
   },
   {
     id: 'gale',
-    chance: 0.16,
+    chance: 0.1,
+    cooldown: 5,
     when: (ctx) => ctx.binsAtKerb > 0,
     build: () => ({
       type: 'incident',
@@ -112,7 +136,8 @@ export const random = [
   },
   {
     id: 'flies',
-    chance: 0.22,
+    chance: 0.12,
+    cooldown: 6,
     when: (ctx) => ctx.grimyBins,
     build: () => ({
       type: 'incident',
