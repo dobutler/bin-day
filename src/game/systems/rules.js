@@ -146,10 +146,13 @@ export function correctBinsFor(category, rs) {
 export function contamination(binType, items, rs) {
   const bin = rs.bins[binType];
   if (!bin) return [];
+  const cardRule = rs.conduct.flattenedCardOnly && bin.accepts.includes('paper-card');
   return items.filter(
     (item) =>
       !bin.accepts.includes(item.category) ||
-      needsUnpaidSubscription(bin, item.category)
+      needsUnpaidSubscription(bin, item.category) ||
+      // Unflattened boxes reduce vehicle capacity, apparently.
+      (cardRule && item.category === 'paper-card' && item.flattenable)
   );
 }
 

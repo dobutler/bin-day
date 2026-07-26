@@ -123,12 +123,17 @@ export const random = [
   },
   {
     id: 'inspection',
-    chance: 0.1,
+    chance: 0.07,
     when: (ctx) => ctx.day > 18,
-    build: () => ({
+    build: (ctx) => ({
       type: 'message',
       from: 'Street WhatsApp group',
-      text: 'Heads up — someone in a hi-vis is lifting lids along the street.',
+      text: ctx.pick([
+        'Heads up — someone in a hi-vis is lifting lids along the street.',
+        'There is a man with a clipboard going bin to bin. He has a lanyard. He means it.',
+        'Waste enforcement are on the road. They photographed the Hendersons\' recycling.',
+        'The hi-vis is back. Bring your bin in if you value your evening.',
+      ]),
     }),
   },
   {

@@ -78,6 +78,7 @@ export const baseRuleset = {
     lidMustClose: true,        // propped lids = refused collection
     sideWasteAllowed: false,   // bags next to the bin are ignored
     earliestPutOutHour: 18,    // night before; earlier annoys neighbours
-    contaminationSticker: true // wrong items in blue = whole bin refused
+    contaminationSticker: true, // wrong items in blue = whole bin refused
+    flattenedCardOnly: false    // a later letter turns this on
   },
 };

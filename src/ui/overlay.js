@@ -271,7 +271,8 @@ function calendarView(rs) {
   for (let n = 0; n < 28; n++) {
     const day = first + n;
     const bins = collectionsOn(day, rs);
-    const effective = letters.filter((l) => l.effectiveDay === day);
+    // Flavour-only letters change nothing, so the calendar should not warn.
+    const effective = letters.filter((l) => l.effectiveDay === day && l.ops.length);
     const arriving = letters.filter((l) => l.arrivesDay === day);
     const classes = [
       'cal-day',
@@ -351,9 +352,12 @@ function phoneView() {
       : '';
   const list = state.messages
     .map(
-      (m) => `<div class="msg ${m.unread ? 'unread' : ''}">
+      (m) => `<div class="msg ${m.unread ? 'unread' : ''} ${
+        /Council/i.test(m.from) ? 'council' : ''
+      }">
         <span class="from">${m.from}</span>
-        <p>${m.text}</p><span class="when">day ${m.day}</span></div>`
+        <p>${fillTemplate(state, m.text)}</p>
+        <span class="when">day ${m.day}</span></div>`
     )
     .join('');
   return favour + list;

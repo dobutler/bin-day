@@ -4,6 +4,7 @@
 
 import { items as catalogue, dailyProduction } from '../data/items.js';
 import { scripted, random as randomEvents } from '../data/events.js';
+import { chatter } from '../data/chatter.js';
 import { defaultScheme, binNameFor, colourOf } from '../data/palette.js';
 import { newStreet, decideStreet, resolveStreet } from './street.js';
 import {
@@ -312,9 +313,10 @@ export function advanceDay(state) {
   resolveCollections(state, rs);
   resolveStreet(state, rs, (text, tone) => pushLog(state, text, tone));
   resolveKerbClutter(state, rs);
-  rollRandomEvents(state, rs);
+  const eventFired = rollRandomEvents(state, rs);
   deliverLetters(state);
   fireScriptedEvents(state);
+  if (!eventFired) rollChatter(state);
   tickTray(state);
   produce(state);
   recoverTime(state);
@@ -466,8 +468,22 @@ function rollRandomEvents(state, rs) {
       from: built.from, text: built.text, day: state.day, unread: true,
     });
     pushLog(state, built.text, built.standing ? 'bad' : 'info');
-    break;
+    return true;
   }
+  return false;
+}
+
+// The road talking among itself. No mechanics, just company.
+function rollChatter(state) {
+  if (state.rand() > 0.45) return;
+  if (!state.chatterSeen) state.chatterSeen = [];
+  const unseen = chatter.filter((c) => !state.chatterSeen.includes(c.text));
+  const pool = unseen.length ? unseen : chatter;
+  const line = pool[Math.floor(state.rand() * pool.length)];
+  state.chatterSeen.push(line.text);
+  state.messages.unshift({
+    from: line.from, text: line.text, day: state.day, unread: true,
+  });
 }
 
 // A proper gale. Bins on the kerb go over and the contents go everywhere.
