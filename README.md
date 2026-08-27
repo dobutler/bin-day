@@ -123,19 +123,6 @@ every bin on the road looks the same at 7am. Before wheeling anything out,
 you can look through the window to see whether anyone is about, and get
 dressed first if they are.
 
-## Publishing privately
-
-- **Private repo, run locally** — free, works today. Clone and `npm run dev`.
-- **GitHub Pages from a private repo** — needs GitHub Pro on a personal
-  account (or Team on an organisation). The published site is still public;
-  only the source stays private.
-- **A site that is genuinely access-controlled** — GitHub only offers that
-  through Enterprise Cloud. Cloudflare Pages plus Cloudflare Access is the
-  cheaper route: it deploys from a private repo and puts an email-based login
-  in front of the site.
-
-`.github/workflows/deploy.yml` handles the Pages route once the plan allows it.
-
 ## Licence
 
 MIT.
